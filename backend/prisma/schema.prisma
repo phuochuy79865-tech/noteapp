@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  displayName       String
+  passwordHash      String
+  avatarUrl         String?
+  isActivated       Boolean   @default(false)
+  activationToken   String?
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+
+  // Preferences
+  theme             String    @default("light")   // light | dark
+  fontFamily        String    @default("default")
+  noteColor         String    @default("#ffffff")
+  viewMode          String    @default("grid")    // grid | list
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  notes             Note[]
+  labels            Label[]
+  sharedNotes       NoteShare[]   @relation("SharedWith")
+  sharedByMe        NoteShare[]   @relation("SharedBy")
+  collaborations    NoteCollaborator[]
+
+  @@map("users")
+}
+
+model Note {
+  id          String    @id @default(uuid())
+  title       String    @default("")
+  content     String    @default("")
+  isPinned    Boolean   @default(false)
+  isLocked    Boolean   @default(false)
+  lockHash    String?   // bcrypt hash of note password
+  color       String?
+  fontFamily  String?
+
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  images      NoteImage[]
+  labels      NoteLabel[]
+  shares      NoteShare[]
+  collaborators NoteCollaborator[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("notes")
+}
+
+model NoteImage {
+  id        String  @id @default(uuid())
+  noteId    String
+  note      Note    @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  url       String
+  filename  String
+  size      Int
+  createdAt DateTime @default(now())
+
+  @@map("note_images")
+}
+
+model Label {
+  id        String  @id @default(uuid())
+  name      String
+  color     String  @default("#6366f1")
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes     NoteLabel[]
+  createdAt DateTime @default(now())
+
+  @@unique([name, userId])
+  @@map("labels")
+}
+
+model NoteLabel {
+  noteId    String
+  labelId   String
+  note      Note    @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  label     Label   @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, labelId])
+  @@map("note_labels")
+}
+
+model NoteShare {
+  id          String    @id @default(uuid())
+  noteId      String
+  note        Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  sharedById  String
+  sharedBy    User      @relation("SharedBy", fields: [sharedById], references: [id])
+  sharedWithId String
+  sharedWith  User      @relation("SharedWith", fields: [sharedWithId], references: [id])
+  permission  String    @default("view")  // view | edit
+  createdAt   DateTime  @default(now())
+
+  @@unique([noteId, sharedWithId])
+  @@map("note_shares")
+}
+
+model NoteCollaborator {
+  id        String   @id @default(uuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  socketId  String?
+  lastSeen  DateTime @default(now())
+
+  @@unique([noteId, userId])
+  @@map("note_collaborators")
+}
