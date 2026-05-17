@@ -21,22 +21,33 @@ const { generalLimiter } = require('./middleware/rateLimiter');
 const app = express();
 const server = http.createServer(app);
 
-// ================= SOCKET.IO =================
+// ======================================================
+// ALLOWED ORIGINS
+// ======================================================
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://noteapp.vercel.app',
+  'https://noteapp-frontend-pi.vercel.app',
+];
+
+// ======================================================
+// SOCKET.IO
+// ======================================================
 const io = new Server(server, {
   cors: {
-    origin: [
-  "http://localhost:5173",
-  "https://noteapp.vercel.app"
-] ,
-    methods: ['GET', 'POST'],
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
   },
+
   transports: ['websocket', 'polling'],
 });
 
 setupSocketIO(io);
 
-// ================= MIDDLEWARE =================
+// ======================================================
+// SECURITY MIDDLEWARE
+// ======================================================
 app.use(
   helmet({
     crossOriginResourcePolicy: {
@@ -47,26 +58,60 @@ app.use(
 
 app.use(compression());
 
-// ===== FIX CORS =====
+// ======================================================
+// CORS
+// ======================================================
 app.use(
   cors({
-    origin: process.env.APP_URL,
+    origin: function (origin, callback) {
+
+      // allow requests with no origin
+      // mobile apps / postman
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(
+          new Error(`CORS blocked for origin: ${origin}`)
+        );
+      }
+    },
+
     credentials: true,
   })
 );
 
+// ======================================================
+// BODY PARSER
+// ======================================================
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: '10mb',
+  })
+);
+
+// ======================================================
+// RATE LIMITER
+// ======================================================
 app.use(generalLimiter);
 
-// ================= STATIC FILES =================
+// ======================================================
+// STATIC FILES
+// ======================================================
 app.use(
   '/uploads',
   express.static(path.join(__dirname, '../uploads'))
 );
 
-// ================= ROOT ROUTE =================
+// ======================================================
+// ROOT ROUTE
+// ======================================================
 app.get('/', (req, res) => {
   res.json({
     message: 'NoteApp Backend API Running',
@@ -74,7 +119,9 @@ app.get('/', (req, res) => {
   });
 });
 
-// ================= HEALTH CHECK =================
+// ======================================================
+// HEALTH CHECK
+// ======================================================
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -82,21 +129,29 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ================= API ROUTES =================
+// ======================================================
+// API ROUTES
+// ======================================================
 app.use('/api/auth', authRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/labels', labelRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/uploads', uploadRoutes);
 
-// ================= ERROR HANDLER =================
+// ======================================================
+// ERROR HANDLER
+// ======================================================
 app.use(errorHandler);
 
-// ================= START SERVER =================
+// ======================================================
+// START SERVER
+// ======================================================
 const PORT = process.env.PORT || 4000;
 
 server.listen(PORT, () => {
   logger.info(`🚀 Server running on port ${PORT}`);
+
+  console.log(`🚀 Server running on port ${PORT}`);
 });
 
 module.exports = { app, io };
