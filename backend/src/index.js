@@ -21,17 +21,14 @@ const { generalLimiter } = require('./middleware/rateLimiter');
 const app = express();
 const server = http.createServer(app);
 
-// ================= ALLOWED ORIGINS =================
-const allowedOrigins = [
-  'http://localhost:5173',
-  'https://noteapp-frontend-pi.vercel.app',
-];
-
 // ================= SOCKET.IO =================
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    origin: [
+  "http://localhost:5173",
+  "https://noteapp.vercel.app"
+] ,
+    methods: ['GET', 'POST'],
     credentials: true,
   },
   transports: ['websocket', 'polling'],
@@ -50,10 +47,10 @@ app.use(
 
 app.use(compression());
 
-// ================= CORS =================
+// ===== FIX CORS =====
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: process.env.APP_URL,
     credentials: true,
   })
 );
